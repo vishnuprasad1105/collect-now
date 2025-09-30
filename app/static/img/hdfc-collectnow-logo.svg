@@ -1,0 +1,11 @@
+<svg width="220" height="48" viewBox="0 0 220 48" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoTitle">
+  <title id="logoTitle">HDFC CollectNow</title>
+  <rect width="220" height="48" rx="8" fill="#0B3B8C"/>
+  <g transform="translate(12,8)">
+    <rect x="0" y="0" width="32" height="32" fill="#FFFFFF" rx="3"/>
+    <rect x="3" y="3" width="26" height="26" fill="#D9252A" rx="2"/>
+    <rect x="12.5" y="3" width="7" height="26" fill="#0B3B8C"/>
+    <rect x="3" y="12.5" width="26" height="7" fill="#0B3B8C"/>
+  </g>
+  <text x="64" y="29" font-family="'Inter', 'Segoe UI', sans-serif" font-size="18" font-weight="600" fill="#FFFFFF">HDFC CollectNow</text>
+</svg>

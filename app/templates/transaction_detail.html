@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis #{{ transaction.id }} · CollectNow{% endblock %}
+
+{% block content %}
+{% set summary = response_payload.get('summary', {}) %}
+{% set categories = summary.get('category_breakdown', {}) %}
+
+<section class="card card--summary">
+  <header class="card__header">
+    <div>
+      <h2>Analysis #{{ transaction.id }}</h2>
+      <p class="card__meta">{{ transaction.original_filename }} · {{ transaction.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+    </div>
+    <span class="status status--{{ transaction.status }}">{{ transaction.status|capitalize }}</span>
+  </header>
+
+  <div class="summary-grid">
+    <div class="summary-metric">
+      <span class="summary-metric__label">Checklist</span>
+      <span class="summary-metric__value">{{ summary.get('checks_passed', 0) }}/{{ summary.get('total_checks', 0) }}</span>
+    </div>
+    <div class="summary-metric">
+      <span class="summary-metric__label">Visual Checks</span>
+      <span class="summary-metric__value">{{ summary.get('references_matched', 0) }}/{{ summary.get('references', 0) }}</span>
+    </div>
+    {% for category, stats in categories|dictsort %}
+      <div class="summary-metric">
+        <span class="summary-metric__label">{{ category | replace('-', ' ') | title }}</span>
+        <span class="summary-metric__value">{{ stats.passed }}/{{ stats.total }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h3>Checklist & Policy Validation</h3>
+  <ul class="checklist">
+    {% for item in checklist.values() %}
+      <li class="checklist__item">
+        <details class="detail-panel" {% if not item.passed %}open{% endif %}>
+          <summary>
+            <div class="detail-panel__summary">
+              <span class="icon icon--{{ 'pass' if item.passed else 'fail' }}"></span>
+              <div>
+                <p class="checklist__label">
+                  {{ item.label }}
+                  {% if item.category %}
+                    <span class="checklist__category">{{ item.category | replace('-', ' ') | upper }}</span>
+                  {% endif %}
+                </p>
+                <p class="detail-panel__status">{{ 'Passed' if item.passed else 'Attention Needed' }}</p>
+              </div>
+            </div>
+          </summary>
+          <div class="detail-panel__body">
+            {% if item.context %}
+              <p class="checklist__context">Context: {{ item.context }}</p>
+            {% endif %}
+            {% if not item.passed %}
+              <p class="checklist__detail">Missing keywords: {{ item.missing_keywords | join(', ') }}</p>
+              {% if item.hint %}
+                <p class="checklist__hint">Hint: {{ item.hint }}</p>
+              {% endif %}
+            {% else %}
+              <p class="checklist__detail">Found keywords: {{ item.found_keywords | join(', ') }}</p>
+            {% endif %}
+          </div>
+        </details>
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h3>Reference Screenshot Validation</h3>
+  {% if images %}
+    <ul class="image-results">
+      {% for name, result in images.items() %}
+        <li class="image-results__item">
+          <details class="detail-panel" {% if not result.matched %}open{% endif %}>
+            <summary>
+              <div class="detail-panel__summary">
+                <span class="icon icon--{{ 'pass' if result.matched else 'fail' }}"></span>
+                <div>
+                  <p class="image-results__label">{{ result.label or name }}</p>
+                  <p class="detail-panel__status">{{ 'Matched' if result.matched else 'Review Needed' }}</p>
+                </div>
+              </div>
+            </summary>
+            <div class="detail-panel__body">
+              {% if result.score is not none %}
+                <p class="image-results__detail">Similarity score: {{ result.score }}</p>
+              {% endif %}
+              {% if result.hash_distance is not none %}
+                <p class="image-results__detail">Perceptual hash delta: {{ result.hash_distance }}</p>
+              {% endif %}
+              {% if result.analysis.description %}
+                <p class="image-results__detail">Focus: {{ result.analysis.description }}</p>
+              {% endif %}
+              <p class="image-results__detail">Expectation: {{ result.expectation }}</p>
+              {% if result.analysis.text_requirement %}
+                <p class="image-results__detail">
+                  Linked text check:
+                  {% if result.analysis.text_requirement.type == 'linked_check' %}
+                    {{ result.analysis.text_requirement.label }} — {{ 'passed' if result.analysis.text_requirement.passed else 'missing' }}
+                  {% else %}
+                    Token "{{ result.analysis.text_requirement.token }}" {{ 'found' if result.analysis.text_requirement.passed else 'missing' }} in document
+                  {% endif %}
+                </p>
+              {% endif %}
+              {% if result.analysis.reason %}
+                <p class="image-results__detail">Note: {{ result.analysis.reason }}</p>
+              {% endif %}
+              {% if result.analysis.evidence %}
+                <div class="image-results__evidence">
+                  <p class="image-results__detail">Evidence:</p>
+                  <ul>
+                    {% for evidence in result.analysis.evidence %}
+                      <li><span class="image-results__origin">{{ evidence.origin }}</span> — {{ evidence.snippet }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+              {% if result.analysis.hint %}
+                <p class="image-results__hint">Hint: {{ result.analysis.hint }}</p>
+              {% endif %}
+              {% if result.analysis.note %}
+                <p class="image-results__detail">{{ result.analysis.note }}</p>
+              {% endif %}
+            </div>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No reference images processed.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>Processing Timeline</h3>
+  <ol class="log">
+    {% for line in logs %}
+      <li>{{ line }}</li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="card">
+  <h3>Request / Response Snapshot</h3>
+  <div class="grid grid--split">
+    <div>
+      <h4>Request</h4>
+      <pre><code>{{ transaction.request_payload }}</code></pre>
+    </div>
+    <div>
+      <h4>Response</h4>
+      <pre><code>{{ transaction.response_payload }}</code></pre>
+    </div>
+  </div>
+</section>
+
+<p><a href="{{ url_for('main.index') }}" class="back-link">Back to dashboard</a></p>
+{% endblock %}

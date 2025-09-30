@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}CollectNow Analyzer{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h2>Upload Audit Evidence</h2>
+  <p>Supported formats: PDF, DOCX, and legacy DOC. Maximum size: 16&nbsp;MB.</p>
+  <form action="{{ url_for('main.index') }}" method="post" enctype="multipart/form-data" class="upload-form">
+    <label for="document" class="upload-form__label">Choose document</label>
+    <input type="file" name="document" id="document" accept=".pdf,.docx,.doc" required>
+    <button type="submit">Analyze Document</button>
+  </form>
+  <ul class="feature-list">
+    <li><span class="badge">Checklist</span> Validates Security Audit confirmations with explicit YES markers.</li>
+    <li><span class="badge">Brand</span> OCR checks HDFC CollectNow branding and the Razorpay embed URL within screenshots.</li>
+    <li><span class="badge">API</span> Inspects request/response samples for mandatory parameters.</li>
+    <li><span class="badge">Visuals</span> Identifies success and failure flows automatically across embedded pages.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Recent Analyses</h2>
+  {% if transactions %}
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Filename</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+            <tr>
+              <td>#{{ tx.id }}</td>
+              <td>{{ tx.original_filename }}</td>
+              <td>
+                <span class="status status--{{ tx.status }}">{{ tx.status|capitalize }}</span>
+              </td>
+              <td>{{ tx.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td><a href="{{ url_for('main.transaction_detail', transaction_id=tx.id) }}">View</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p>No analyses yet. Upload a document to get started.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HDFC Bank Collect Now - Integration Assistant</title>
+    <style>
+        :root {
+            --primary-color: #004c8f; /* HDFC Blue */
+            --secondary-color: #e41e27; /* HDFC Red */
+            --accent-color: #ff6b00; /* Orange accent */
+            --light-bg: #ffffff; /* Light background */
+            --light-border: #e0e0e0; /* Light border color */
+            --light-text: #333333; /* Dark text color */
+            --medium-text: #666666; /* Medium text color */
+            --user-msg-bg: #e6f2ff; /* User message background */
+            --bot-msg-bg: #f5f5f5; /* Bot message background */
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --radius: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f9f9f9;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Demo content to show the chatbot in context */
+        .demo-content {
+            max-width: 800px;
+            padding: 30px;
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-content h1 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .demo-content .hdfc-logo {
+            height: 40px;
+        }
+
+        .demo-content p {
+            color: var(--medium-text);
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        /* Chatbot Icon */
+        .chatbot-icon {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        .chatbot-icon:hover {
+            transform: scale(1.05);
+        }
+
+        .chatbot-icon svg {
+            width: 70%;
+            height: 70%;
+            fill: white;
+            transition: opacity 0.3s ease;
+        }
+
+        .chat-icon {
+            opacity: 1;
+        }
+
+        .close-icon {
+            position: absolute;
+            opacity: 0;
+            width: 50%;
+            height: 50%;
+        }
+
+        .chatbot-icon.active .chat-icon {
+            opacity: 0;
+        }
+
+        .chatbot-icon.active .close-icon {
+            opacity: 1;
+        }
+
+        /* Chat Container - Small Version */
+        .chat-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background-color: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            z-index: 999;
+            overflow: hidden;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            border: 1px solid var(--light-border);
+        }
+
+        .chat-container.open {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Expanded Chat Container */
+        .chat-container.expanded {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 90%;
+            height: 80%;
+            max-width: 1000px;
+            max-height: 700px;
+            opacity: 0;
+            z-index: 1001;
+            transition: all 0.3s ease;
+        }
+
+        .chat-container.expanded.open {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* Overlay for expanded chat */
+        .chat-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .chat-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Chat Header */
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-header-avatar {
+            width: 30px;
+            height: 30px;
+            margin-right: 10px;
+            border-radius: 50%;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .chat-header-text h3 {
+            font-size: 16px;
+            margin-bottom: 2px;
+        }
+
+        .chat-header-text p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .close-chat {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: none; /* Hidden in small chat */
+        }
+
+        .chat-container.expanded .close-chat {
+            display: block; /* Visible only in expanded chat */
+        }
+
+        /* Expand button in header */
+        .expand-btn {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Messages Area */
+        .messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: white;
+        }
+
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .message-row {
+            display: flex;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .user-message-row {
+            justify-content: flex-end;
+        }
+
+        .bot-message-row {
+            justify-content: flex-start;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            line-height: 1.4;
+            position: relative;
+            white-space: pre-wrap; /* Allow line breaks */
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: var(--user-msg-bg);
+            color: var(--light-text);
+            border-bottom-right-radius: 5px;
+            border: 1px solid #cce5ff;
+            order: 2; /* Message comes after copy button for user */
+        }
+
+        .bot-message {
+            background-color: var(--bot-msg-bg);
+            color: var(--light-text);
+            border-bottom-left-radius: 5px;
+            border: 1px solid var(--light-border);
+            order: 1; /* Message comes before copy button for bot */
+        }
+
+        /* Copy button for messages */
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            margin: 0 8px;
+            opacity: 0.7;
+        }
+
+        .copy-btn:hover {
+            background-color: #f0f0f0;
+            border-color: var(--primary-color);
+            opacity: 1;
+        }
+
+        .user-message-row .copy-btn {
+            order: 1; /* Copy button before message for user */
+        }
+
+        .bot-message-row .copy-btn {
+            order: 2; /* Copy button after message for bot */
+        }
+
+        /* Larger messages in expanded view */
+        .chat-container.expanded .message {
+            max-width: 70%;
+            padding: 15px 20px;
+            font-size: 15px;
+        }
+
+        .message-time {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 5px;
+            text-align: right;
+        }
+
+        /* Feedback buttons for each bot message */
+        .feedback-buttons {
+            display: flex;
+            justify-content: flex-start;
+            gap: 5px;
+            margin-top: 5px;
+            margin-left: 5px;
+            padding: 5px;
+        }
+
+        .feedback-btn {
+            background: transparent;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .feedback-btn:hover {
+            background-color: #f0f0f0;
+            border-color: var(--primary-color);
+        }
+
+        .feedback-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Larger feedback buttons in expanded view */
+        .chat-container.expanded .feedback-btn {
+            width: 36px;
+            height: 36px;
+        }
+
+        .chat-container.expanded .feedback-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Input Area */
+        .chat-input {
+            padding: 15px;
+            border-top: 1px solid var(--light-border);
+            display: flex;
+            background-color: white;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .chat-container.expanded .chat-input {
+            padding: 20px;
+        }
+
+        .input-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-input textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background-color: white;
+            color: var(--light-text);
+            outline: none;
+            resize: none;
+            min-height: 40px;
+            max-height: 120px;
+            font-family: inherit;
+            line-height: 1.4;
+        }
+
+        .chat-container.expanded .chat-input textarea {
+            padding: 12px 18px;
+            font-size: 15px;
+        }
+
+        .chat-input textarea:focus {
+            border-color: var(--primary-color);
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .chat-container.expanded .send-button {
+            width: 42px;
+            height: 42px;
+        }
+
+        /* Support Ticket Flow - In Chat */
+        .support-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: var(--radius);
+            border: 1px solid var(--light-border);
+        }
+
+        .support-question {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+
+        .support-options {
+            display: flex;
+            gap: 10px;
+        }
+
+        .support-option {
+            padding: 8px 15px;
+            background-color: white;
+            border: 1px solid var(--light-border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .support-option:hover {
+            border-color: var(--primary-color);
+            background-color: #f0f7ff;
+        }
+
+        /* Feedback confirmation message */
+        .feedback-confirmation {
+            font-size: 12px;
+            color: var(--medium-text);
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* Copy confirmation message */
+        .copy-confirmation {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 1002;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .copy-confirmation.show {
+            opacity: 1;
+        }
+
+        /* Welcome message */
+        .welcome-message {
+            text-align: center;
+            padding: 20px;
+            color: var(--medium-text);
+        }
+
+        .welcome-message h3 {
+            margin-bottom: 10px;
+            color: var(--primary-color);
+        }
+
+        /* Scrollbar styling */
+        .messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: #f5f5f5;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        .messages::-webkit-scrollbar-thumb:hover {
+            background: #bbb;
+        }
+    </style>
+</head>
+<body>
+    <!-- Demo Content -->
+    <div class="demo-content">
+        <h1>
+            Collect Now - Integration Platform
+        </h1>
+        <p>This is a demo page showing the HDFC Bank Collect Now integration assistant in action. The chatbot appears as a small icon in the bottom right corner and expands when clicked.</p>
+        <p>Try asking questions like "How do I integrate payment gateway?" or "What APIs are available?" to see the assistant in action.</p>
+    </div>
+
+    <!-- Copy Confirmation Message -->
+    <div class="copy-confirmation" id="copyConfirmation">Copied to clipboard!</div>
+
+    <!-- Chat Overlay for Expanded View -->
+    <div class="chat-overlay" id="chatOverlay"></div>
+
+    <!-- Chatbot Icon -->
+    <div class="chatbot-icon" id="chatbotIcon">
+        <svg class="chat-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+        </svg>
+        <svg class="close-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <div class="chat-header-avatar">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="#004c8f">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
+                </div>
+                <div class="chat-header-text">
+                    <h3>HDFC Bank Collect Now</h3>
+                    <p>Integration Assistant</p>
+                </div>
+            </div>
+            <div>
+                <button class="expand-btn" id="toggleExpandBtn" title="Expand chat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                </button>
+                <button class="close-chat" id="closeChat">×</button>
+            </div>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="welcome-message">
+                <h3>Welcome to HDFC Bank Collect Now</h3>
+                <p>I'm here to help with your payment integration questions. How can I assist you today?</p>
+            </div>
+        </div>
+
+        <div class="chat-input">
+            <div class="input-container">
+                <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+            </div>
+            <button class="send-button" id="sendButton">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const chatbotIcon = document.getElementById('chatbotIcon');
+        const chatContainer = document.getElementById('chatContainer');
+        const closeChat = document.getElementById('closeChat');
+        const toggleExpandBtn = document.getElementById('toggleExpandBtn');
+        const chatOverlay = document.getElementById('chatOverlay');
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const copyConfirmation = document.getElementById('copyConfirmation');
+
+        let isExpanded = false;
+
+        // Toggle chat visibility from bottom icon
+        chatbotIcon.addEventListener('click', () => {
+            if (!isExpanded) {
+                chatContainer.classList.add('open');
+                chatbotIcon.classList.add('active');
+            }
+        });
+
+        // Close chat - different behavior based on mode
+        closeChat.addEventListener('click', () => {
+            if (isExpanded) {
+                // In expanded mode, close the chat entirely
+                chatContainer.classList.remove('open');
+                chatbotIcon.classList.remove('active');
+                collapseChat();
+            } else {
+                // In small mode, just close the chat
+                chatContainer.classList.remove('open');
+                chatbotIcon.classList.remove('active');
+            }
+        });
+
+        // Toggle expand/collapse
+        toggleExpandBtn.addEventListener('click', () => {
+            if (isExpanded) {
+                collapseChat();
+            } else {
+                expandChat();
+            }
+        });
+
+        // Close expanded chat when clicking overlay
+        chatOverlay.addEventListener('click', () => {
+            if (isExpanded) {
+                collapseChat();
+            }
+        });
+
+        // Expand chat to full view
+        function expandChat() {
+            isExpanded = true;
+            chatContainer.classList.add('expanded');
+            chatOverlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            
+            // Update expand button icon
+            toggleExpandBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                </svg>
+            `;
+            toggleExpandBtn.title = 'Collapse chat';
+        }
+
+        // Collapse chat to small view
+        function collapseChat() {
+            isExpanded = false;
+            chatContainer.classList.remove('expanded');
+            chatOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+            
+            // Update expand button icon
+            toggleExpandBtn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                </svg>
+            `;
+            toggleExpandBtn.title = 'Expand chat';
+        }
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Handle Enter key (Shift+Enter for new line, Enter to send)
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Allow new line with Shift+Enter
+                    return;
+                } else {
+                    // Send message with Enter
+                    e.preventDefault();
+                    sendMessage();
+                }
+            }
+        });
+
+        // Show copy confirmation
+        function showCopyConfirmation() {
+            copyConfirmation.classList.add('show');
+            setTimeout(() => {
+                copyConfirmation.classList.remove('show');
+            }, 3000);
+        }
+
+        // Send message function
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText === '') return;
+
+            // Add user message
+            addMessage(messageText, 'user');
+            
+            // Reset textarea
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            
+            // Simulate bot response after a short delay
+            setTimeout(() => {
+                const responses = [
+                    "I understand you're asking about payment integration. Let me check our documentation for the best approach.",
+                    "Based on your query, I recommend reviewing our Collect Now API documentation for detailed implementation steps.",
+                    "For that payment integration scenario, we have a dedicated guide that covers all the necessary steps.",
+                    "I can help with that! HDFC Collect Now supports various integration methods depending on your use case.",
+                    "That's a common payment integration question. Let me provide you with the relevant resources.",
+                    "For HDFC Bank Collect Now integration, you'll need to set up merchant credentials first. Would you like me to guide you through the process?",
+                    "Our Collect Now platform offers multiple payment options including UPI, Net Banking, and Cards. Which method are you interested in?"
+                ];
+                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                addMessage(randomResponse, 'bot');
+            }, 1000);
+        }
+
+        // Add message to chat
+        function addMessage(text, sender) {
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('message-container');
+            
+            const messageRow = document.createElement('div');
+            messageRow.classList.add('message-row', `${sender}-message-row`);
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            
+            const messageContent = document.createElement('div');
+            messageContent.textContent = text;
+            messageDiv.appendChild(messageContent);
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.classList.add('message-time');
+            timeDiv.textContent = getCurrentTime();
+            messageDiv.appendChild(timeDiv);
+            
+            // Add copy button to message row (not inside the message bubble)
+            const copyBtn = document.createElement('button');
+            copyBtn.classList.add('copy-btn');
+            copyBtn.title = 'Copy message';
+            copyBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            `;
+            copyBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyConfirmation();
+                });
+            });
+            
+            // Add elements to message row based on sender
+            if (sender === 'user') {
+                messageRow.appendChild(copyBtn);
+                messageRow.appendChild(messageDiv);
+            } else {
+                messageRow.appendChild(messageDiv);
+                messageRow.appendChild(copyBtn);
+            }
+            
+            messageContainer.appendChild(messageRow);
+            
+            // Add feedback buttons only for bot messages
+            if (sender === 'bot') {
+                const feedbackButtons = document.createElement('div');
+                feedbackButtons.classList.add('feedback-buttons');
+                feedbackButtons.innerHTML = `
+                    <button class="feedback-btn thumbs-up" title="Helpful">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                        </svg>
+                    </button>
+                    <button class="feedback-btn thumbs-down" title="Not Helpful">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+                        </svg>
+                    </button>
+                    <button class="feedback-btn support-ticket" title="Raise Ticket">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                    </button>
+                `;
+                messageContainer.appendChild(feedbackButtons);
+                
+                // Add event listeners to the new buttons
+                const thumbsUpBtn = feedbackButtons.querySelector('.thumbs-up');
+                const thumbsDownBtn = feedbackButtons.querySelector('.thumbs-down');
+                const supportTicketBtn = feedbackButtons.querySelector('.support-ticket');
+                
+                thumbsUpBtn.addEventListener('click', function() {
+                    // Disable all feedback buttons for this message
+                    thumbsUpBtn.disabled = true;
+                    thumbsDownBtn.disabled = true;
+                    supportTicketBtn.disabled = true;
+                    
+                    // Add confirmation message
+                    const confirmation = document.createElement('div');
+                    confirmation.classList.add('feedback-confirmation');
+                    confirmation.textContent = 'Thank you for your feedback!';
+                    messageContainer.appendChild(confirmation);
+                });
+                
+                thumbsDownBtn.addEventListener('click', function() {
+                    // Disable all feedback buttons for this message
+                    thumbsUpBtn.disabled = true;
+                    thumbsDownBtn.disabled = true;
+                    supportTicketBtn.disabled = true;
+                    
+                    // Add confirmation message
+                    const confirmation = document.createElement('div');
+                    confirmation.classList.add('feedback-confirmation');
+                    confirmation.textContent = 'We\'re sorry to hear that. We\'ll work to improve.';
+                    messageContainer.appendChild(confirmation);
+                });
+                
+                supportTicketBtn.addEventListener('click', function() {
+                    // Disable all feedback buttons for this message
+                    thumbsUpBtn.disabled = true;
+                    thumbsDownBtn.disabled = true;
+                    supportTicketBtn.disabled = true;
+                    
+                    // Start support ticket flow within the chat
+                    startSupportFlow(messageContainer);
+                });
+            }
+            
+            messagesContainer.appendChild(messageContainer);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Support ticket flow within the chat
+        function startSupportFlow(messageContainer) {
+            const supportFlow = document.createElement('div');
+            supportFlow.classList.add('support-flow');
+            supportFlow.innerHTML = `
+                <div class="support-question">Are you not satisfied with the response? Do you want to create a support ticket?</div>
+                <div class="support-options">
+                    <div class="support-option" data-choice="yes">Yes, create ticket</div>
+                    <div class="support-option" data-choice="no">No, thanks</div>
+                </div>
+            `;
+            
+            messageContainer.appendChild(supportFlow);
+            
+            // Add event listeners to support options
+            const supportOptions = supportFlow.querySelectorAll('.support-option');
+            supportOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const choice = this.getAttribute('data-choice');
+                    
+                    if (choice === 'yes') {
+                        supportFlow.innerHTML = `
+                            <div class="support-question">Support ticket created successfully! Our HDFC Bank team will contact you shortly.</div>
+                        `;
+                    } else {
+                        supportFlow.innerHTML = `
+                            <div class="support-question">Okay, let me know if you need help with anything else regarding Collect Now integration.</div>
+                        `;
+                    }
+                });
+            });
+            
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Get current time in HH:MM format
+        function getCurrentTime() {
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        // Event listeners for sending messages
+        sendButton.addEventListener('click', sendMessage);
+    </script>
+</body>
+</html>
