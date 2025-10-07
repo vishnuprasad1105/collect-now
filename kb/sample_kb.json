@@ -1,7 +1,0 @@
-[
-  {
-    "question": "how do I setup webhooks?",
-    "answer": "setup webhooks : https://hdfcbank-collectnow-docs.razorpay.com/webhooks/setup-edit-payments/\n\nsample payload : https://hdfcbank-collectnow-docs.razorpay.com/webhooks/payloads/payments/",
-    "tags": ["webhooks", "documentation", "integration"]
-  }
-]

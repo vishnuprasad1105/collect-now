@@ -9,12 +9,12 @@ import zipfile
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
-import pdfplumber
 import fitz  # type: ignore[import]
-from PIL import Image
+import pdfplumber
 from docx import Document
+from PIL import Image
 from rapidfuzz import fuzz
 
 pytesseract = None
@@ -30,11 +30,7 @@ from .security_rules import (
     IMAGE_TEXT_EXPECTATIONS,
     REQUEST_REQUIRED_FIELDS,
     RESPONSE_REQUIRED_FIELDS,
-    ChecklistRule,
-    FieldBundle,
-    ImageTextExpectation,
 )
-
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
 
@@ -46,6 +42,16 @@ class ProcessingResult:
     logs: list[str]
     status: str
     response_payload: dict
+
+    def to_dict(self):
+        # This method converts the entire result object into a JSON-serializable dictionary
+        return {
+            "checklist": self.checklist,
+            "images": self.images,
+            "logs": self.logs,
+            "status": self.status,
+            "response_payload": self.response_payload,
+        }
 
 
 @dataclass
@@ -245,7 +251,6 @@ def extract_text_lines_pdf(file_path: Path, logs: list[str]) -> list[str]:
                 line = raw_line.strip()
                 if line:
                     lines.append(line)
-                    logs.append(f"[Page {page_number}] {line}")
     return lines
 
 
@@ -256,7 +261,6 @@ def extract_text_lines_docx(file_path: Path, logs: list[str]) -> list[str]:
         line = paragraph.text.strip()
         if line:
             lines.append(line)
-            logs.append(f"[Paragraph] {line}")
     return lines
 
 
@@ -267,7 +271,7 @@ def extract_text_lines_doc(file_path: Path, logs: list[str]) -> list[str]:
 
     try:
         raw_bytes = textract.process(str(file_path), extension="doc")
-    except Exception as exc:  # pragma: no cover - external tool failure
+    except Exception as exc:
         logs.append(f"Failed to extract text from .doc: {exc}")
         return []
 
@@ -277,7 +281,6 @@ def extract_text_lines_doc(file_path: Path, logs: list[str]) -> list[str]:
         line = raw_line.strip()
         if line:
             lines.append(line)
-            logs.append(f"[DOC] {line}")
     return lines
 
 
@@ -316,9 +319,6 @@ def evaluate_checklist(
                 missing_keywords.append("yes")
 
         passed = len(missing_keywords) == 0
-        status = "PASSED" if passed else "FAILED"
-        logs.append(f"Checklist item '{rule.label}' => {status}")
-
         results[rule.id] = {
             "label": rule.label,
             "passed": passed,
@@ -369,9 +369,6 @@ def evaluate_text_expectations(
         context_line = original_lines[context_index] if context_index is not None else None
 
         passed = len(missing_keywords) == 0
-        status = "PASSED" if passed else "FAILED"
-        logs.append(f"Text expectation '{expectation.label}' => {status}")
-
         results[expectation.id] = {
             "label": expectation.label,
             "passed": passed,
@@ -405,9 +402,6 @@ def evaluate_field_bundle(
     context_line = original_lines[context_index] if context_index is not None else None
 
     passed = len(missing) == 0
-    status = "PASSED" if passed else "FAILED"
-    logs.append(f"Payload expectation '{bundle.label}' => {status}")
-
     result = OrderedDict(
         [
             (
@@ -452,7 +446,6 @@ def extract_images_pdf(file_path: Path, logs: list[str]) -> list[ExtractedImage]
             image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
             origin = f"PDF page {page_num + 1} · image {image_index}"
             images.append(ExtractedImage(image=image, origin=origin))
-            logs.append(f"Extracted image {image_index} from page {page_num + 1}")
     return images
 
 
@@ -466,8 +459,7 @@ def extract_images_docx(file_path: Path, logs: list[str]) -> list[ExtractedImage
                     image = Image.open(io.BytesIO(data)).convert("RGB")
                     origin = f"DOCX asset {name}"
                     images.append(ExtractedImage(image=image, origin=origin))
-                    logs.append(f"Extracted image from {name}")
-                except Exception:  # pragma: no cover - corrupted image fallback
+                except Exception:
                     logs.append(f"Failed to decode image {name}")
     return images
 
@@ -480,7 +472,6 @@ def extract_images_doc(file_path: Path, logs: list[str]) -> list[ExtractedImage]
 def extract_text_from_image_payload(payload: ExtractedImage, logs: list[str]) -> str:
     ocr = resolve_ocr()
     if ocr is None:
-        logs.append("pytesseract not installed; unable to OCR " + payload.origin)
         try:
             payload.image.close()
         except Exception:
@@ -489,7 +480,7 @@ def extract_text_from_image_payload(payload: ExtractedImage, logs: list[str]) ->
 
     try:
         text = ocr.image_to_string(payload.image)
-    except Exception as exc:  # pragma: no cover - OCR failure
+    except Exception as exc:
         logs.append(f"OCR failed for {payload.origin}: {exc}")
         return ""
     finally:
@@ -498,13 +489,7 @@ def extract_text_from_image_payload(payload: ExtractedImage, logs: list[str]) ->
         except Exception:
             pass
 
-    cleaned = text.strip()
-    if cleaned:
-        snippet = textwrap.shorten(cleaned.replace("\n", " "), width=140)
-        logs.append(f"[Image OCR] {payload.origin}: {snippet}")
-    else:
-        logs.append(f"[Image OCR] {payload.origin}: (no text detected)")
-    return cleaned
+    return text.strip()
 
 
 def evaluate_image_text_expectations(
@@ -524,14 +509,6 @@ def evaluate_image_text_expectations(
                 "normalized": normalize_line(entry["text"]),
             }
         )
-
-    combined_image_text = " ".join(item["normalized"] for item in normalized_entries)
-    if image_text_entries and combined_image_text:
-        logs.append(
-            f"Aggregated OCR text length: {len(combined_image_text)} characters across {len(image_text_entries)} images"
-        )
-    if not image_text_entries:
-        logs.append("No OCR text extracted from images; visual checks may be incomplete")
 
     for expectation in IMAGE_TEXT_EXPECTATIONS:
         matches: list[dict] = []
@@ -574,22 +551,9 @@ def evaluate_image_text_expectations(
 
         results[expectation.id] = {
             "matched": matched,
-            "score": None,
-            "hash_distance": None,
             "label": expectation.label,
-            "reference_file": None,
             "analysis": analysis,
-            "expectation": expectation.description,
-            "expectation_id": expectation.id,
         }
-
-        status = "MATCH" if matched else "NO MATCH"
-        logs.append(f"Visual expectation '{expectation.label}' => {status}")
-        if matches:
-            for evidence in matches:
-                logs.append(
-                    f"  · Evidence from {evidence['origin']}: {evidence['snippet']}"
-                )
 
     return results
 
@@ -613,7 +577,6 @@ def image_text_satisfies_expectation(expectation: ImageTextExpectation, text: st
     return True
 
 
-
 def detect_mime_type(file_path: Path) -> str:
     mime, _ = mimetypes.guess_type(file_path.as_uri())
     return mime or "application/octet-stream"
@@ -621,13 +584,15 @@ def detect_mime_type(file_path: Path) -> str:
 
 def to_json(data: dict | list) -> str:
     return json.dumps(data, indent=2, default=str)
+
+
 def resolve_ocr() -> object | None:
     global pytesseract
     if pytesseract is not None:
         return pytesseract
     try:
-        import pytesseract as _pytesseract  # type: ignore[import]
-    except ImportError:  # pragma: no cover - optional dependency
+        import pytesseract as _pytesseract
+    except ImportError:
         return None
     pytesseract = _pytesseract
     return pytesseract
